@@ -4,7 +4,7 @@ from typing import Optional
 from src.database import inisialisasi_database, tambah_akun_db, ambil_akun_list, tambah_tugas_db, get_statistik_tugas
 from src.bot import jalankan_bot_multiprofil
 
-app = FastAPI(title="TikTok Bot API", version="1.0.0")
+app = FastAPI(title="TikTok Bot API", version="1.1.0")
 
 @app.on_event("startup")
 def startup_event():
@@ -13,20 +13,24 @@ def startup_event():
 class AccountCreate(BaseModel):
     nama_profil: str
     browser_type: Optional[str] = "chrome"
+    proxy: Optional[str] = None
 
 class TaskCreate(BaseModel):
     url_video: str
     profil_id: Optional[int] = None
 
-@app.post("/accounts", summary="Tambah Akun / Profil Baru")
+@app.post("/accounts", summary="Tambah Akun / Profil Baru (Support Proxy)")
 def create_account(account: AccountCreate):
-    tambah_akun_db(account.nama_profil, account.browser_type)
-    return {"status": "success", "message": f"Profil '{account.nama_profil}' ({account.browser_type}) berhasil ditambahkan."}
+    tambah_akun_db(account.nama_profil, account.browser_type, account.proxy)
+    return {
+        "status": "success", 
+        "message": f"Profil '{account.nama_profil}' ({account.browser_type}) dengan proxy '{account.proxy}' berhasil ditambahkan."
+    }
 
 @app.get("/accounts", summary="Daftar Akun")
 def list_accounts():
     accounts = ambil_akun_list()
-    return [{"id": acc[0], "nama_profil": acc[1], "browser_type": acc[2]} for acc in accounts]
+    return [{"id": acc[0], "nama_profil": acc[1], "browser_type": acc[2], "proxy": acc[3]} for acc in accounts]
 
 @app.post("/tasks", summary="Input Link TikTok dan Tambah ke Antrean")
 def create_task(task: TaskCreate):
@@ -52,7 +56,7 @@ def create_task(task: TaskCreate):
         "url_video": task.url_video
     }
 
-@app.post("/tasks/run", summary="Jalankan Bot Antrean Pending")
+@app.post("/tasks/run", summary="Jalankan Bot Antrean Pending (Mendukung Headless & Proxy)")
 def run_bot_task():
     try:
         jalankan_bot_multiprofil()

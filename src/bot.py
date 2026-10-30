@@ -15,13 +15,15 @@ from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.firefox import GeckoDriverManager
 from src.database import get_connection
 
+IS_HEADLESS = os.getenv("HEADLESS", "false").lower() == "true"
+
 def jalankan_bot_multiprofil():
     try:
         conn = get_connection()
         cursor = conn.cursor()
         
         cursor.execute("""
-            SELECT t.id, a.nama_profil, a.browser_type, t.url_video 
+            SELECT t.id, a.nama_profil, a.browser_type, a.proxy, t.url_video 
             FROM tugas_like t 
             JOIN akun a ON t.profil_id = a.id 
             WHERE t.status = 'Pending'
@@ -34,8 +36,8 @@ def jalankan_bot_multiprofil():
             conn.close()
             return
 
-        for index, (tugas_id, nama_profil, browser_type, url_video) in enumerate(tugas_list):
-            logging.info(f"[Tugas {tugas_id}] Menggunakan {browser_type.upper()} dengan profil '{nama_profil}' untuk menyukai: {url_video}")
+        for index, (tugas_id, nama_profil, browser_type, proxy, url_video) in enumerate(tugas_list):
+            logging.info(f"[Tugas {tugas_id}] Menggunakan {browser_type.upper()} | Profil: '{nama_profil}' | Proxy: {proxy or 'None'} | URL: {url_video}")
             
             driver = None
             proses_chrome = None
@@ -54,13 +56,20 @@ def jalankan_bot_multiprofil():
                     
                     debug_port = 9222 + index
                     
-                    proses_chrome = subprocess.Popen([
+                    chrome_args = [
                         jalur_chrome,
                         f"--remote-debugging-port={debug_port}",
                         f"--user-data-dir={direktori_data}",
                         "--no-sandbox",
                         "--disable-dev-shm-usage"
-                    ])
+                    ]
+                    
+                    if proxy:
+                        chrome_args.append(f"--proxy-server={proxy}")
+                    if IS_HEADLESS:
+                        chrome_args.append("--headless=new")
+                        
+                    proses_chrome = subprocess.Popen(chrome_args)
                     time.sleep(3)
                     
                     chrome_options = ChromeOptions()
@@ -76,6 +85,17 @@ def jalankan_bot_multiprofil():
                     firefox_options = FirefoxOptions()
                     firefox_options.profile = direktori_data
                     
+                    if IS_HEADLESS:
+                        firefox_options.add_argument("-headless")
+                        
+                    if proxy and ":" in proxy:
+                        ip, port = proxy.split(":")
+                        firefox_options.set_preference("network.proxy.type", 1)
+                        firefox_options.set_preference("network.proxy.http", ip)
+                        firefox_options.set_preference("network.proxy.http_port", int(port))
+                        firefox_options.set_preference("network.proxy.ssl", ip)
+                        firefox_options.set_preference("network.proxy.ssl_port", int(port))
+                            
                     service = FirefoxService(GeckoDriverManager().install())
                     driver = webdriver.Firefox(service=service, options=firefox_options)
                 else:
@@ -85,15 +105,22 @@ def jalankan_bot_multiprofil():
                 # Buka URL video target
                 driver.get(url_video)
                 
-                # Explicit Wait
+                # Human-like behavior: Jeda acak & Scroll halaman ke bawah sedikit
+                time.sleep(random.uniform(3.0, 5.0))
+                try:
+                    driver.execute_script("window.scrollBy(0, 300);")
+                except:
+                    pass
+                time.sleep(random.uniform(1.5, 2.5))
+                
+                # Explicit Wait untuk tombol like
                 wait = WebDriverWait(driver, 15)
                 tombol_like = wait.until(
                     EC.element_to_be_clickable((By.XPATH, '//span[@data-e2e="like-icon"]'))
                 )
                 
-                time.sleep(random.uniform(1.0, 2.0))
                 tombol_like.click()
-                logging.info("-> Berhasil memberikan Like!")
+                logging.info("-> Berhasil memberikan Like (Human-like action applied)!")
                 
                 cursor.execute("UPDATE tugas_like SET status = 'Sukses' WHERE id = %s", (tugas_id,))
                 conn.commit()

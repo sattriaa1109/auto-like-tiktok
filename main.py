@@ -17,7 +17,10 @@ def tambah_akun_menu():
     browser = input("Pilih browser (chrome/firefox) [default: chrome]: ").strip().lower()
     if not browser:
         browser = "chrome"
-    tambah_akun_db(nama, browser)
+    proxy = input("Masukkan proxy (format ip:port atau kosongkan): ").strip()
+    if not proxy:
+        proxy = None
+    tambah_akun_db(nama, browser, proxy)
 
 def input_link_menu():
     url = input("Masukkan URL video TikTok: ").strip()
@@ -31,13 +34,13 @@ def input_link_menu():
         return
         
     print("\nDaftar Profil Tersedia:")
-    for idx, (acc_id, nama, b_type) in enumerate(akun_list):
-        print(f"{idx + 1}. {nama} ({b_type})")
+    for idx, (acc_id, nama, b_type, proxy) in enumerate(akun_list):
+        print(f"{idx + 1}. {nama} ({b_type}) - Proxy: {proxy or 'None'}")
         
     pilihan_akun = input("Pilih nomor profil (atau ketik 'all' untuk semua akun): ").strip()
     
     if pilihan_akun.lower() == 'all':
-        for acc_id, nama, b_type in akun_list:
+        for acc_id, nama, b_type, proxy in akun_list:
             tambah_tugas_db(acc_id, url)
         print("Semua profil ditambahkan ke antrean tugas.")
     else:
@@ -68,7 +71,7 @@ def import_urls_from_file_menu():
         return
         
     print("\nDaftar Profil Tersedia:")
-    for idx, (acc_id, nama, b_type) in enumerate(akun_list):
+    for idx, (acc_id, nama, b_type, proxy) in enumerate(akun_list):
         print(f"{idx + 1}. {nama} ({b_type})")
         
     pilihan_akun = input("Pilih nomor profil untuk menerapkan semua URL di `urls.txt` (atau 'all'): ").strip()
@@ -118,7 +121,7 @@ if __name__ == "__main__":
         print("\n=== TIKTOK BOT MENU ===")
         print("1. Jalankan semua tugas 'Pending'")
         print("2. Input Link TikTok Manual")
-        print("3. Tambah Akun / Profil Baru")
+        print("3. Tambah Akun / Profil Baru (Support Proxy)")
         print("4. Import URL Massal dari `urls.txt`")
         print("5. Lihat Statistik Tugas")
         print("6. Keluar")

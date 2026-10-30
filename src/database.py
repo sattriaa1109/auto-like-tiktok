@@ -22,8 +22,19 @@ def inisialisasi_database():
             CREATE TABLE IF NOT EXISTS akun (
                 id SERIAL PRIMARY KEY,
                 nama_profil VARCHAR(255) UNIQUE NOT NULL,
-                browser_type VARCHAR(50) DEFAULT 'chrome'
+                browser_type VARCHAR(50) DEFAULT 'chrome',
+                proxy VARCHAR(255) DEFAULT NULL
             )
+        ''')
+        
+        # Tambahkan kolom proxy jika tabel sudah ada sebelumnya tanpa kolom proxy
+        cursor.execute('''
+            DO $$ 
+            BEGIN 
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='akun' AND column_name='proxy') THEN
+                    ALTER TABLE akun ADD COLUMN proxy VARCHAR(255) DEFAULT NULL;
+                END IF;
+            END $$;
         ''')
         
         cursor.execute('''
@@ -42,18 +53,18 @@ def inisialisasi_database():
     except Exception as e:
         logging.error(f"Gagal menghubungkan ke PostgreSQL: {e}")
 
-def tambah_akun_db(nama, browser):
+def tambah_akun_db(nama, browser, proxy=None):
     try:
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT INTO akun (nama_profil, browser_type) VALUES (%s, %s) ON CONFLICT (nama_profil) DO NOTHING", 
-            (nama, browser)
+            "INSERT INTO akun (nama_profil, browser_type, proxy) VALUES (%s, %s, %s) ON CONFLICT (nama_profil) DO UPDATE SET browser_type = EXCLUDED.browser_type, proxy = EXCLUDED.proxy", 
+            (nama, browser, proxy)
         )
         conn.commit()
         cursor.close()
         conn.close()
-        logging.info(f"Profil '{nama}' ({browser}) berhasil ditambahkan ke database.")
+        logging.info(f"Profil '{nama}' ({browser}, proxy: {proxy}) berhasil disimpan ke database.")
     except Exception as e:
         logging.error(f"Gagal menambah akun: {e}")
 
@@ -61,7 +72,7 @@ def ambil_akun_list():
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT id, nama_profil, browser_type FROM akun")
+        cursor.execute("SELECT id, nama_profil, browser_type, proxy FROM akun")
         result = cursor.fetchall()
         cursor.close()
         conn.close()
