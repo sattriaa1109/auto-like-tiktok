@@ -83,3 +83,16 @@ def tambah_tugas_db(profil_id, url):
         conn.close()
     except Exception as e:
         logging.error(f"Gagal menambah tugas: {e}")
+
+def get_statistik_tugas():
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT status, COUNT(*) FROM tugas_like GROUP BY status")
+        result = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return dict(result)
+    except Exception as e:
+        logging.error(f"Gagal mengambil statistik: {e}")
+        return {}

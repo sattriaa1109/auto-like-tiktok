@@ -1,0 +1,3 @@
+# Masukkan daftar link URL video TikTok di bawah ini (satu URL per baris, baris dengan '#' diabaikan)
+# Contoh:
+# https://www.tiktok.com/@example/video/7123456789012345678
