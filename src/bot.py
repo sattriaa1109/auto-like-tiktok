@@ -3,7 +3,6 @@ import subprocess
 import time
 import random
 import logging
-import psycopg2
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.chrome.options import Options as ChromeOptions
@@ -14,57 +13,11 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.firefox import GeckoDriverManager
+from src.database import get_connection
 
-# Setup Logging profesional dengan timestamp
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[logging.StreamHandler()]
-)
-
-# Konfigurasi Koneksi PostgreSQL (Mendukung Environment Variables)
-DB_CONFIG = {
-    "dbname": os.getenv("DB_NAME", "tiktok_bot"),
-    "user": os.getenv("DB_USER", "postgres"),
-    "password": os.getenv("DB_PASSWORD", "your_password"),
-    "host": os.getenv("DB_HOST", "localhost"),
-    "port": os.getenv("DB_PORT", "5432")
-}
-
-# 1. INISIALISASI DATABASE POSTGRESQL
-def inisialisasi_database():
-    try:
-        conn = psycopg2.connect(**DB_CONFIG)
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS akun (
-                id SERIAL PRIMARY KEY,
-                nama_profil VARCHAR(255) UNIQUE NOT NULL,
-                browser_type VARCHAR(50) DEFAULT 'chrome'
-            )
-        ''')
-        
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS tugas_like (
-                id SERIAL PRIMARY KEY,
-                profil_id INTEGER REFERENCES akun(id),
-                url_video TEXT NOT NULL,
-                status VARCHAR(50) DEFAULT 'Pending'
-            )
-        ''')
-        
-        conn.commit()
-        cursor.close()
-        conn.close()
-        logging.info("Database PostgreSQL berhasil diinisialisasi.")
-    except Exception as e:
-        logging.error(f"Gagal menghubungkan ke PostgreSQL: {e}")
-
-# 2. PROSES UTAMA RUNNER BOT
 def jalankan_bot_multiprofil():
     try:
-        conn = psycopg2.connect(**DB_CONFIG)
+        conn = get_connection()
         cursor = conn.cursor()
         
         cursor.execute("""
@@ -132,7 +85,7 @@ def jalankan_bot_multiprofil():
                 # Buka URL video target
                 driver.get(url_video)
                 
-                # Menggunakan Explicit Wait agar lebih handal mendesak elemen
+                # Explicit Wait
                 wait = WebDriverWait(driver, 15)
                 tombol_like = wait.until(
                     EC.element_to_be_clickable((By.XPATH, '//span[@data-e2e="like-icon"]'))
@@ -169,7 +122,3 @@ def jalankan_bot_multiprofil():
         logging.info("Semua tugas di database selesai diproses.")
     except Exception as e:
         logging.error(f"Koneksi/Eksekusi database error: {e}")
-
-if __name__ == "__main__":
-    inisialisasi_database()
-    jalankan_bot_multiprofil()
