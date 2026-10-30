@@ -2,6 +2,7 @@ import os
 import subprocess
 import time
 import random
+import logging
 import psycopg2
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
@@ -9,16 +10,25 @@ from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.firefox.service import Service as FirefoxService
 from selenium.webdriver.firefox.options import Options as FirefoxOptions
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.firefox import GeckoDriverManager
 
-# Konfigurasi Koneksi PostgreSQL
+# Setup Logging profesional dengan timestamp
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler()]
+)
+
+# Konfigurasi Koneksi PostgreSQL (Mendukung Environment Variables)
 DB_CONFIG = {
-    "dbname": "tiktok_bot",
-    "user": "postgres",
-    "password": "your_password",
-    "host": "localhost",
-    "port": "5432"
+    "dbname": os.getenv("DB_NAME", "tiktok_bot"),
+    "user": os.getenv("DB_USER", "postgres"),
+    "password": os.getenv("DB_PASSWORD", "your_password"),
+    "host": os.getenv("DB_HOST", "localhost"),
+    "port": os.getenv("DB_PORT", "5432")
 }
 
 # 1. INISIALISASI DATABASE POSTGRESQL
@@ -27,16 +37,14 @@ def inisialisasi_database():
         conn = psycopg2.connect(**DB_CONFIG)
         cursor = conn.cursor()
         
-        # Tabel untuk menyimpan daftar profil dan browser yang digunakan
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS akun (
                 id SERIAL PRIMARY KEY,
                 nama_profil VARCHAR(255) UNIQUE NOT NULL,
-                browser_type VARCHAR(50) DEFAULT 'chrome' -- 'chrome' atau 'firefox'
+                browser_type VARCHAR(50) DEFAULT 'chrome'
             )
         ''')
         
-        # Tabel untuk tugas target like
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS tugas_like (
                 id SERIAL PRIMARY KEY,
@@ -49,17 +57,16 @@ def inisialisasi_database():
         conn.commit()
         cursor.close()
         conn.close()
-        print("Database PostgreSQL berhasil diinisialisasi.")
+        logging.info("Database PostgreSQL berhasil diinisialisasi.")
     except Exception as e:
-        print(f"Gagal menghubungkan ke PostgreSQL: {e}")
+        logging.error(f"Gagal menghubungkan ke PostgreSQL: {e}")
 
-# 2. PROSES UTAMA RUNNER BOT (Multi-Browser & Linux Compatible)
+# 2. PROSES UTAMA RUNNER BOT
 def jalankan_bot_multiprofil():
     try:
         conn = psycopg2.connect(**DB_CONFIG)
         cursor = conn.cursor()
         
-        # Ambil tugas yang belum dikerjakan (Pending) beserta info browser
         cursor.execute("""
             SELECT t.id, a.nama_profil, a.browser_type, t.url_video 
             FROM tugas_like t 
@@ -69,13 +76,13 @@ def jalankan_bot_multiprofil():
         tugas_list = cursor.fetchall()
         
         if not tugas_list:
-            print("Tidak ada tugas antrean like di database.")
+            logging.info("Tidak ada tugas antrean like di database.")
             cursor.close()
             conn.close()
             return
 
         for index, (tugas_id, nama_profil, browser_type, url_video) in enumerate(tugas_list):
-            print(f"\n[Tugas {tugas_id}] Menggunakan {browser_type.upper()} dengan profil '{nama_profil}' untuk menyukai: {url_video}")
+            logging.info(f"[Tugas {tugas_id}] Menggunakan {browser_type.upper()} dengan profil '{nama_profil}' untuk menyukai: {url_video}")
             
             driver = None
             proses_chrome = None
@@ -83,7 +90,6 @@ def jalankan_bot_multiprofil():
             
             try:
                 if browser_type == 'chrome':
-                    # Linux path untuk Google Chrome / Chromium
                     jalur_chrome = "/usr/bin/google-chrome"
                     if not os.path.exists(jalur_chrome):
                         jalur_chrome = "/usr/bin/chromium"
@@ -93,7 +99,6 @@ def jalankan_bot_multiprofil():
                     direktori_data = os.path.abspath(f"./chrome_profiles/{nama_profil}")
                     os.makedirs(direktori_data, exist_ok=True)
                     
-                    # Port dinamis agar tidak bentrok antar profil
                     debug_port = 9222 + index
                     
                     proses_chrome = subprocess.Popen([
@@ -116,34 +121,35 @@ def jalankan_bot_multiprofil():
                     os.makedirs(direktori_data, exist_ok=True)
                     
                     firefox_options = FirefoxOptions()
-                    # Menggunakan profil khusus Firefox di Linux
                     firefox_options.profile = direktori_data
                     
                     service = FirefoxService(GeckoDriverManager().install())
                     driver = webdriver.Firefox(service=service, options=firefox_options)
                 else:
-                    print(f"Browser '{browser_type}' tidak didukung.")
+                    logging.warning(f"Browser '{browser_type}' tidak didukung.")
                     continue
 
                 # Buka URL video target
                 driver.get(url_video)
-                time.sleep(random.uniform(4.0, 6.0))
                 
-                # Cari dan klik tombol like TikTok
-                try:
-                    tombol_like = driver.find_element(By.XPATH, '//span[@data-e2e="like-icon"]')
-                    tombol_like.click()
-                    print("-> Berhasil memberikan Like!")
-                    
-                    cursor.execute("UPDATE tugas_like SET status = 'Sukses' WHERE id = %s", (tugas_id,))
-                    conn.commit()
-                except Exception:
-                    print("-> Gagal menekan tombol. Kemungkinan sudah di-like atau elemen berubah.")
-                    cursor.execute("UPDATE tugas_like SET status = 'Gagal' WHERE id = %s", (tugas_id,))
-                    conn.commit()
-                    
+                # Menggunakan Explicit Wait agar lebih handal mendesak elemen
+                wait = WebDriverWait(driver, 15)
+                tombol_like = wait.until(
+                    EC.element_to_be_clickable((By.XPATH, '//span[@data-e2e="like-icon"]'))
+                )
+                
+                time.sleep(random.uniform(1.0, 2.0))
+                tombol_like.click()
+                logging.info("-> Berhasil memberikan Like!")
+                
+                cursor.execute("UPDATE tugas_like SET status = 'Sukses' WHERE id = %s", (tugas_id,))
+                conn.commit()
+                
             except Exception as err:
-                print(f"Terjadi kesalahan sistem browser: {err}")
+                logging.error(f"-> Gagal menekan tombol / error browser: {err}")
+                conn.rollback()
+                cursor.execute("UPDATE tugas_like SET status = 'Gagal' WHERE id = %s", (tugas_id,))
+                conn.commit()
             
             finally:
                 if driver:
@@ -160,9 +166,9 @@ def jalankan_bot_multiprofil():
                 
         cursor.close()
         conn.close()
-        print("\nSemua tugas di database selesai diproses.")
+        logging.info("Semua tugas di database selesai diproses.")
     except Exception as e:
-        print(f"Koneksi/Eksekusi database error: {e}")
+        logging.error(f"Koneksi/Eksekusi database error: {e}")
 
 if __name__ == "__main__":
     inisialisasi_database()
