@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.env
+.venv/
+env/
+venv/
+
+# Browser profiles & session storage
+chrome_profiles/
+firefox_profiles/
+
+# WebDriver Manager
+.wdm/
+
+# Debug artifacts
+*.png
+*.log

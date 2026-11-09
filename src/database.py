@@ -14,6 +14,8 @@ def get_connection():
     return psycopg2.connect(**DB_CONFIG)
 
 def inisialisasi_database():
+    conn = None
+    cursor = None
     try:
         conn = get_connection()
         cursor = conn.cursor()
@@ -27,7 +29,6 @@ def inisialisasi_database():
             )
         ''')
         
-        # Tambahkan kolom proxy jika tabel sudah ada sebelumnya tanpa kolom proxy
         cursor.execute('''
             DO $$ 
             BEGIN 
@@ -47,13 +48,18 @@ def inisialisasi_database():
         ''')
         
         conn.commit()
-        cursor.close()
-        conn.close()
         logging.info("Database PostgreSQL berhasil diinisialisasi.")
     except Exception as e:
         logging.error(f"Gagal menghubungkan ke PostgreSQL: {e}")
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 def tambah_akun_db(nama, browser, proxy=None):
+    conn = None
+    cursor = None
     try:
         conn = get_connection()
         cursor = conn.cursor()
@@ -62,26 +68,36 @@ def tambah_akun_db(nama, browser, proxy=None):
             (nama, browser, proxy)
         )
         conn.commit()
-        cursor.close()
-        conn.close()
         logging.info(f"Profil '{nama}' ({browser}, proxy: {proxy}) berhasil disimpan ke database.")
     except Exception as e:
         logging.error(f"Gagal menambah akun: {e}")
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 def ambil_akun_list():
+    conn = None
+    cursor = None
     try:
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT id, nama_profil, browser_type, proxy FROM akun")
         result = cursor.fetchall()
-        cursor.close()
-        conn.close()
         return result
     except Exception as e:
         logging.error(f"Gagal mengambil daftar akun: {e}")
         return []
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 def tambah_tugas_db(profil_id, url):
+    conn = None
+    cursor = None
     try:
         conn = get_connection()
         cursor = conn.cursor()
@@ -90,20 +106,28 @@ def tambah_tugas_db(profil_id, url):
             (profil_id, url)
         )
         conn.commit()
-        cursor.close()
-        conn.close()
     except Exception as e:
         logging.error(f"Gagal menambah tugas: {e}")
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 def get_statistik_tugas():
+    conn = None
+    cursor = None
     try:
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT status, COUNT(*) FROM tugas_like GROUP BY status")
         result = cursor.fetchall()
-        cursor.close()
-        conn.close()
         return dict(result)
     except Exception as e:
         logging.error(f"Gagal mengambil statistik: {e}")
         return {}
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()

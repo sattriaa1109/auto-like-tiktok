@@ -1,7 +1,7 @@
 import os
 import logging
 from src.database import inisialisasi_database, tambah_akun_db, ambil_akun_list, tambah_tugas_db, get_statistik_tugas
-from src.bot import jalankan_bot_multiprofil
+from src.bot import jalankan_bot_multiprofil, buka_browser_login
 
 logging.basicConfig(
     level=logging.INFO,
@@ -115,6 +115,27 @@ def tampilkan_statistik():
             print(f"- {status}: {total}")
     print("-----------------------")
 
+def login_akun_menu():
+    akun_list = ambil_akun_list()
+    if not akun_list:
+        print("Belum ada akun di database. Tambahkan akun terlebih dahulu.")
+        return
+        
+    print("\nPilih Profil untuk Login:")
+    for idx, (acc_id, nama, b_type, proxy) in enumerate(akun_list):
+        print(f"{idx + 1}. {nama} ({b_type}) - Proxy: {proxy or 'None'}")
+        
+    pilihan = input("Pilih nomor profil: ").strip()
+    try:
+        idx = int(pilihan) - 1
+        if 0 <= idx < len(akun_list):
+            acc_id, nama, b_type, proxy = akun_list[idx]
+            buka_browser_login(nama, b_type, proxy)
+        else:
+            print("Pilihan profil tidak valid.")
+    except ValueError:
+        print("Input tidak valid.")
+
 if __name__ == "__main__":
     inisialisasi_database()
     while True:
@@ -124,9 +145,10 @@ if __name__ == "__main__":
         print("3. Tambah Akun / Profil Baru (Support Proxy)")
         print("4. Import URL Massal dari `urls.txt`")
         print("5. Lihat Statistik Tugas")
-        print("6. Keluar")
+        print("6. Login Akun (Buka Jendela Browser untuk Login Manual)")
+        print("7. Keluar")
         
-        pilihan = input("Pilih menu (1-6): ").strip()
+        pilihan = input("Pilih menu (1-7): ").strip()
         
         if pilihan == "1":
             jalankan_bot_multiprofil()
@@ -139,6 +161,8 @@ if __name__ == "__main__":
         elif pilihan == "5":
             tampilkan_statistik()
         elif pilihan == "6":
+            login_akun_menu()
+        elif pilihan == "7":
             print("Keluar dari program.")
             break
         else:
